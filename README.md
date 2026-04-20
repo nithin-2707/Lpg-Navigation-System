@@ -155,37 +155,6 @@ This app uses **OpenStreetMap tiles** via the **Leaflet** library—no API key, 
 
 ---
 
-## 📱 Deployment
-
-### Deploy to Vercel (Recommended)
-
-The repo is pre-configured for Vercel serverless deployment. No additional setup needed.
-
-**Steps:**
-1. Push to GitHub (already done):
-   ```bash
-   git push origin main
-   ```
-
-2. Go to [Vercel Dashboard](https://vercel.com)
-
-3. Click **"New Project"** → Import the GitHub repo
-
-4. Vercel auto-detects the configuration:
-   - **Framework**: Node.js + Vite
-   - **Build Command**: `npm run build` (root)
-   - **Output Directory**: `frontend/dist`
-   - **Environment**: Production
-
-5. Deploy!
-
-**After Deployment:**
-- Your app is live at a URL like `https://lpg-navigation-system.vercel.app`
-- Stations reset on each deploy (in-memory data)
-- Optional: Add a PostgreSQL database for persistent state
-
-### Deploy Locally (Docker/Self-Hosted)
-
 **Build & Run**
 ```bash
 npm run build
