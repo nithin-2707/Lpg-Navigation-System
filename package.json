@@ -1,0 +1,14 @@
+{
+  "name": "lpg-navigation-system",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build -w frontend"
+  },
+  "dependencies": {
+    "serverless-http": "^4.0.0"
+  }
+}
