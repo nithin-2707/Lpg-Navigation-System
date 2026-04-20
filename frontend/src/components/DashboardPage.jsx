@@ -11,8 +11,40 @@ function DashboardPage({
   nearbyStations,
   onOpenNearbyPage,
 }) {
-  const liveSnapshotStations = (nearbyStations.length > 0 ? nearbyStations : mapFeed).slice(0, 8);
+  const mapStations = (nearbyStations.length > 0 ? nearbyStations : mapFeed).slice(0, 14);
   const compactNearbyStations = nearbyStations.slice(0, 4);
+
+  function getBrandCode(station) {
+    const source = `${station.brand || ""} ${station.operator || ""} ${station.name || ""}`.toLowerCase();
+    if (source.includes("indian oil") || source.includes("ioc") || source.includes("iocl")) return "IOCL";
+    if (source.includes("bharat") || source.includes("bpcl")) return "BPCL";
+    if (source.includes("hp") || source.includes("hpcl") || source.includes("hindustan")) return "HP";
+    if (source.includes("jio") || source.includes("reliance")) return "JIO";
+    return "OTR";
+  }
+
+  function getBrandClass(station) {
+    const code = getBrandCode(station);
+    if (code === "IOCL") return "iocl";
+    if (code === "BPCL") return "bpcl";
+    if (code === "HP") return "hp";
+    if (code === "JIO") return "jio";
+    return "otr";
+  }
+
+  function toMapPosition(station, index) {
+    if (typeof station.x === "number" && typeof station.y === "number") {
+      return { left: station.x, top: station.y };
+    }
+
+    const columns = 5;
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    return {
+      left: 12 + column * 18,
+      top: 22 + row * 20
+    };
+  }
 
   return (
     <>
@@ -50,20 +82,26 @@ function DashboardPage({
 
       <section className="board-grid">
         <article className="map-stage">
-          <p className="meta">Live System Snapshot</p>
-          <div className="live-snapshot-grid">
-            {liveSnapshotStations.map((station) => (
-              <div key={station.id} className="live-snapshot-chip">
-                <strong>{station.name}</strong>
-                <span>
-                  {typeof station.distanceKm === "number"
-                    ? `${station.distanceKm.toFixed(2)} km`
-                    : station.city || station.state || "Nearby"}
-                </span>
-              </div>
-            ))}
-            {liveSnapshotStations.length === 0 && (
-              <p className="mode-note">No live nearby stations loaded yet.</p>
+          <p className="meta">Live System Status: Real Data</p>
+          <div className="map-grid-overlay">
+            {mapStations.map((station, index) => {
+              const pos = toMapPosition(station, index);
+              const brandCode = getBrandCode(station);
+              const brandClass = getBrandClass(station);
+
+              return (
+                <button
+                  key={station.id}
+                  className={`map-pin map-pin-${brandClass}`}
+                  style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+                  title={`${station.name} - ${brandCode}`}
+                >
+                  {brandCode}
+                </button>
+              );
+            })}
+            {mapStations.length === 0 && (
+              <p className="mode-note map-empty-note">No live nearby stations loaded yet.</p>
             )}
           </div>
           <div className="activity-head">
