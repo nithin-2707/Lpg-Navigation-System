@@ -1,10 +1,7 @@
 function DashboardPage({
   selectedStation,
   subscribedUsers,
-  loadingUpdate,
-  onQuickToggle,
   mapFeed,
-  onSelectStation,
   alerts,
   history,
   userLocation,
@@ -12,32 +9,30 @@ function DashboardPage({
   locating,
   onRequestLocation,
   nearbyStations,
-  onlyNearbyAvailable,
-  onToggleNearbyAvailable
 }) {
   return (
     <>
       <section className="hero-row">
         <article className="status-card">
-          <p className="meta">Current Instrument Status</p>
-          <h2>{selectedStation?.available ? "Available" : "Not Available"}</h2>
-          {selectedStation && (
-            <p className="fuel-price-line">
-              Petrol: Rs.{selectedStation.petrolPrice.toFixed(2)}/L | Diesel: Rs.{selectedStation.dieselPrice.toFixed(2)}/L
-            </p>
+          <p className="meta">Current Live Station</p>
+          <h2>{selectedStation?.name || "Waiting for location"}</h2>
+          {selectedStation ? (
+            <>
+              <p className="fuel-price-line">
+                {selectedStation.location || selectedStation.city || selectedStation.state || "Live station data from OpenStreetMap"}
+              </p>
+              <p className="broadcast-dot">
+                <span /> Live station data loaded from OpenStreetMap / Photon
+              </p>
+              <p className="mode-note">
+                {selectedStation.brand || selectedStation.operator || selectedStation.source || "Real POI data"}
+              </p>
+            </>
+          ) : (
+            <p className="mode-note">Enable location to load nearby real stations.</p>
           )}
-          <p className="broadcast-dot">
-            <span /> Broadcasting live status to network
-          </p>
-          <button
-            className="switch-control"
-            onClick={onQuickToggle}
-            disabled={loadingUpdate || !selectedStation}
-          >
-            <span className="toggle-track" aria-hidden="true">
-              <span className={selectedStation?.available ? "knob on" : "knob"} />
-            </span>
-            <span className="switch-label">{loadingUpdate ? "Updating..." : "Tap to Toggle"}</span>
+          <button className="wide-pill" onClick={onRequestLocation}>
+            {locating ? "Locating..." : "Use Current Location"}
           </button>
         </article>
 
@@ -51,14 +46,13 @@ function DashboardPage({
 
       <section className="board-grid">
         <article className="map-stage">
-          <p className="meta">Live System Status: Active</p>
+          <p className="meta">Live System Status: Real Data</p>
           <div className="map-grid-overlay">
             {mapFeed.map((point) => (
               <button
                 key={point.id}
-                className={point.available ? "map-dot on" : "map-dot off"}
+                className="map-dot on"
                 style={{ left: `${point.x}%`, top: `${point.y}%` }}
-                onClick={() => onSelectStation(point.id)}
                 title={point.name}
               />
             ))}
@@ -71,21 +65,21 @@ function DashboardPage({
         </article>
 
         <aside className="intel-panel">
-          <h3>Intelligence</h3>
-          <p>Real-time supply alerts</p>
+          <h3>Live Data</h3>
+          <p>Nearby real station records</p>
           <ul>
             {alerts.slice(0, 3).map((item) => (
               <li key={item.id}>
                 <strong>{item.stationName}</strong>
                 <span>
-                  Available at {new Date(item.becameAvailableAt).toLocaleTimeString()}
+                  {item.note || "Live data feed"}
                 </span>
               </li>
             ))}
             {alerts.length === 0 && (
               <li>
-                <strong>No urgent alerts</strong>
-                <span>System is stable for now.</span>
+                <strong>No simulated alerts</strong>
+                <span>Real data mode does not generate fake alerts.</span>
               </li>
             )}
           </ul>
@@ -96,14 +90,9 @@ function DashboardPage({
       <section className="nearby-panel">
         <div className="activity-head">
           <h3>Nearby Fuel Stations (Live Location)</h3>
-          <div className="nearby-actions">
-            <button className="quiet-action" onClick={onToggleNearbyAvailable}>
-              {onlyNearbyAvailable ? "Show All Nearby" : "Only Available"}
-            </button>
-            <button className="wide-pill" onClick={onRequestLocation}>
-              {locating ? "Locating..." : "Use Current Location"}
-            </button>
-          </div>
+          <button className="wide-pill" onClick={onRequestLocation}>
+            {locating ? "Locating..." : "Use Current Location"}
+          </button>
         </div>
         {userLocation && (
           <p className="live-location-text">
@@ -116,14 +105,11 @@ function DashboardPage({
             <button
               key={station.id}
               className="nearby-item"
-              onClick={() => onSelectStation(station.id)}
             >
               <strong>{station.name}</strong>
-              <span>{station.city}, {station.state}</span>
+              <span>{station.location || [station.city, station.state].filter(Boolean).join(", ")}</span>
               <span>{station.distanceKm.toFixed(2)} km away</span>
-              <span className={station.available ? "ok" : "no"}>
-                {station.available ? "Available" : "Not Available"}
-              </span>
+              <span>{station.brand || station.operator || "OpenStreetMap"}</span>
             </button>
           ))}
           {nearbyStations.length === 0 && (
@@ -141,26 +127,23 @@ function DashboardPage({
           <thead>
             <tr>
               <th>Time & Date</th>
-              <th>Action</th>
-              <th>Triggered By</th>
-              <th>Reach</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             {history.slice(0, 5).map((row) => (
               <tr key={row.id}>
                 <td>{new Date(row.timestamp).toLocaleString()}</td>
-                <td>
-                  <span className={row.action === "Available" ? "dot on" : "dot off"} />
-                  {row.action}
-                </td>
-                <td>{row.trigger}</td>
-                <td>{row.reach}</td>
+                <td>Live data only</td>
+                <td>OpenStreetMap</td>
+                <td>{row.note || "No simulated history in real-data mode."}</td>
               </tr>
             ))}
             {history.length === 0 && (
               <tr>
-                <td colSpan="4">No activity yet. Trigger an update to create logs.</td>
+                <td colSpan="4">No simulated activity. Real-data mode does not create fake logs.</td>
               </tr>
             )}
           </tbody>

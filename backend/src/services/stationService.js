@@ -1,24 +1,11 @@
-const { stations } = require("../data/stations");
+const PHOTON_URL = "https://photon.komoot.io/api/";
+const DEFAULT_LOCATION = { latitude: 16.4876, longitude: 80.5015 };
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-const INDIA_BOUNDS = {
-  minLat: 6.5,
-  maxLat: 37.6,
-  minLng: 68.1,
-  maxLng: 97.4
-};
+const cache = new Map();
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-function toMapX(longitude) {
-  const ratio = (longitude - INDIA_BOUNDS.minLng) / (INDIA_BOUNDS.maxLng - INDIA_BOUNDS.minLng);
-  return Number((10 + clamp(ratio, 0, 1) * 80).toFixed(2));
-}
-
-function toMapY(latitude) {
-  const ratio = (INDIA_BOUNDS.maxLat - latitude) / (INDIA_BOUNDS.maxLat - INDIA_BOUNDS.minLat);
-  return Number((12 + clamp(ratio, 0, 1) * 72).toFixed(2));
 }
 
 function toRadians(value) {
@@ -37,204 +24,163 @@ function getDistanceKm(lat1, lng1, lat2, lng2) {
   return earthRadiusKm * c;
 }
 
-const stationMeta = new Map(
-  stations.map((station, index) => [
-    station.id,
-    {
-      petrolPrice: Number((102 + index * 0.45).toFixed(2)),
-      dieselPrice: Number((92 + index * 0.4).toFixed(2)),
-      autoLpgPrice: Number((67 + index * 0.35).toFixed(2)),
-      capacity: 45 + ((station.id * 13) % 50),
-      operatingHours: "24 Hours",
-      mapX: toMapX(station.longitude),
-      mapY: toMapY(station.latitude),
-      lastUpdatedAt: new Date().toISOString()
-    }
-  ])
-);
-
-const historyLog = [];
-const priceAlerts = [];
-
-function appendHistoryEntry(entry) {
-  historyLog.unshift(entry);
-  if (historyLog.length > 120) {
-    historyLog.length = 120;
-  }
+function getBearing(lat1, lng1, lat2, lng2) {
+  const y = Math.sin(toRadians(lng2 - lng1)) * Math.cos(toRadians(lat2));
+  const x =
+    Math.cos(toRadians(lat1)) * Math.sin(toRadians(lat2)) -
+    Math.sin(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.cos(toRadians(lng2 - lng1));
+  return Math.atan2(y, x);
 }
 
-function appendPriceAlert(entry) {
-  priceAlerts.unshift(entry);
-  if (priceAlerts.length > 120) {
-    priceAlerts.length = 120;
-  }
+function getCacheKey(lat, lng, radiusKm, limit) {
+  return [lat.toFixed(4), lng.toFixed(4), radiusKm, limit].join(":");
 }
 
-function getAllStations() {
-  return stations;
+function cleanText(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-function getStationById(id) {
-  return stations.find((item) => item.id === id) || null;
-}
+function normalizeFeature(feature, originLat, originLng) {
+  const properties = feature.properties || {};
+  const coordinates = feature.geometry && feature.geometry.coordinates ? feature.geometry.coordinates : [];
+  const longitude = coordinates[0];
+  const latitude = coordinates[1];
 
-function updateStationStock(id, available, trigger = "Manual Toggle (Admin)") {
-  const station = stations.find((item) => item.id === id);
-
-  if (!station) {
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
     return null;
   }
 
-  const previous = station.available;
-  station.available = available;
-
-  const meta = stationMeta.get(station.id);
-  if (meta) {
-    meta.capacity = Math.max(2, Math.min(98, meta.capacity + (available ? 7 : -9)));
-    meta.lastUpdatedAt = new Date().toISOString();
-  }
-
-  appendHistoryEntry({
-    id: `${Date.now()}-${station.id}-${Math.floor(Math.random() * 1000)}`,
-    stationId: station.id,
-    stationName: station.name,
-    action: available ? "Available" : "Not Available",
-    trigger,
-    reach: `${Math.floor(220 + Math.random() * 980)} pings`,
-    timestamp: new Date().toISOString()
-  });
-
-  return { station, previous };
-}
-
-function getStationHistory() {
-  return historyLog;
-}
-
-function getPriceAlerts() {
-  return priceAlerts;
-}
-
-function getMapFeed() {
-  return stations.map((station) => {
-    const meta = stationMeta.get(station.id);
-    return {
-      id: station.id,
-      name: station.name,
-      available: station.available,
-      latitude: station.latitude,
-      longitude: station.longitude,
-      x: meta ? meta.mapX : 25,
-      y: meta ? meta.mapY : 25
-    };
-  });
-}
-
-function getStationInsights() {
-  return stations.map((station) => {
-    const meta = stationMeta.get(station.id);
-    return {
-      id: station.id,
-      name: station.name,
-      location: station.location,
-      city: station.city,
-      state: station.state,
-      latitude: station.latitude,
-      longitude: station.longitude,
-      available: station.available,
-      petrolPrice: meta ? meta.petrolPrice : 0,
-      dieselPrice: meta ? meta.dieselPrice : 0,
-      autoLpgPrice: meta ? meta.autoLpgPrice : 0,
-      capacity: meta ? meta.capacity : 0,
-      operatingHours: meta ? meta.operatingHours : "N/A",
-      lastUpdatedAt: meta ? meta.lastUpdatedAt : new Date().toISOString()
-    };
-  });
-}
-
-function getNearbyStations(lat, lng, options = {}) {
-  const radiusKm = typeof options.radiusKm === "number" ? options.radiusKm : 60;
-  const limit = typeof options.limit === "number" ? options.limit : 20;
-  const onlyAvailable = Boolean(options.onlyAvailable);
-
-  const ranked = getStationInsights()
-    .map((station) => {
-      const distanceKm = getDistanceKm(lat, lng, station.latitude, station.longitude);
-      return {
-        ...station,
-        distanceKm: Number(distanceKm.toFixed(2))
-      };
-    })
-    .filter((station) => (onlyAvailable ? station.available : true))
-    .sort((a, b) => a.distanceKm - b.distanceKm);
-
-  const withinRadius = ranked.filter((station) => station.distanceKm <= radiusKm);
-  if (withinRadius.length > 0) {
-    return withinRadius.slice(0, limit);
-  }
-
-  // Always return closest stations even when no one falls in radius.
-  return ranked.slice(0, Math.min(5, limit));
-}
-
-function simulateRealtimeTick() {
-  const selected = stations[Math.floor(Math.random() * stations.length)];
-  if (!selected) {
-    return null;
-  }
-
-  const meta = stationMeta.get(selected.id);
-  if (!meta) {
-    return null;
-  }
-
-  const shouldFlipAvailability = Math.random() > 0.6;
-  if (shouldFlipAvailability) {
-    updateStationStock(selected.id, !selected.available, "Automatic Supply Monitor");
-  }
-
-  const fuelTypes = ["petrol", "diesel"];
-  const selectedFuelType = fuelTypes[Math.floor(Math.random() * fuelTypes.length)];
-  const swing = Number((Math.random() * 1.4 - 0.7).toFixed(2));
-  const key = selectedFuelType === "petrol" ? "petrolPrice" : "dieselPrice";
-  const previousPrice = meta[key];
-  meta[key] = Number(Math.max(60, Math.min(150, meta[key] + swing)).toFixed(2));
-  meta.capacity = Math.max(2, Math.min(99, meta.capacity + Math.floor(Math.random() * 11 - 5)));
-  meta.lastUpdatedAt = new Date().toISOString();
-
-  if (Math.abs(meta[key] - previousPrice) >= 0.3) {
-    appendPriceAlert({
-      id: `${Date.now()}-price-${selected.id}`,
-      stationId: selected.id,
-      stationName: selected.name,
-      fuelType: selectedFuelType,
-      previousPrice,
-      currentPrice: meta[key],
-      delta: Number((meta[key] - previousPrice).toFixed(2)),
-      timestamp: new Date().toISOString()
-    });
-  }
+  const name = cleanText(properties.name) || cleanText(properties.brand) || cleanText(properties.operator) || "Fuel station";
+  const locationParts = [properties.street, properties.district, properties.city, properties.county, properties.state]
+    .map(cleanText)
+    .filter(Boolean);
+  const distanceKm = Number(getDistanceKm(originLat, originLng, latitude, longitude).toFixed(2));
+  const openingHours = cleanText(properties.opening_hours);
 
   return {
-    stationId: selected.id,
-    stationName: selected.name,
-    updatedAt: meta.lastUpdatedAt
+    id: `${properties.osm_type || "osm"}-${properties.osm_id || `${latitude}-${longitude}`}`,
+    name,
+    location: locationParts.join(", ") || cleanText(properties.country) || "Live OSM station",
+    city: cleanText(properties.city) || cleanText(properties.district) || cleanText(properties.county) || "",
+    state: cleanText(properties.state) || "",
+    latitude,
+    longitude,
+    distanceKm,
+    brand: cleanText(properties.brand) || cleanText(properties.operator) || "",
+    phone: cleanText(properties.phone) || "",
+    website: cleanText(properties.website) || "",
+    openingHours,
+    isOpenInfoAvailable: Boolean(openingHours),
+    source: "OpenStreetMap Photon"
   };
 }
 
-stations.forEach((station) => {
-  appendHistoryEntry({
-    id: `${Date.now()}-seed-${station.id}`,
-    stationId: station.id,
-    stationName: station.name,
-    action: station.available ? "Available" : "Not Available",
-    trigger: "System Bootstrap",
-    reach: `${Math.floor(180 + Math.random() * 500)} pings`,
-    timestamp: new Date().toISOString()
+async function fetchLiveStations(lat = DEFAULT_LOCATION.latitude, lng = DEFAULT_LOCATION.longitude, options = {}) {
+  const radiusKm = typeof options.radiusKm === "number" ? options.radiusKm : 60;
+  const limit = typeof options.limit === "number" ? options.limit : 20;
+  const cacheKey = getCacheKey(lat, lng, radiusKm, limit);
+  const cached = cache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const url = new URL(PHOTON_URL);
+  url.searchParams.set("q", "petrol pump");
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("lon", String(lng));
+  url.searchParams.set("limit", String(Math.max(limit * 3, 40)));
+  url.searchParams.set("lang", "en");
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "LPG-Navigation-System/1.0",
+      Accept: "application/json"
+    }
   });
-});
+
+  if (!response.ok) {
+    throw new Error(`Failed to load live station data (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const stations = (payload.features || [])
+    .map((feature) => normalizeFeature(feature, lat, lng))
+    .filter(Boolean)
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+  const withinRadius = stations.filter((station) => station.distanceKm <= radiusKm);
+  const result = withinRadius.length > 0 ? withinRadius.slice(0, limit) : stations.slice(0, Math.min(limit, 5));
+
+  cache.set(cacheKey, { timestamp: Date.now(), data: result });
+  return result;
+}
+
+function buildMapFeed(stations, centerLat, centerLng) {
+  return stations.map((station) => {
+    const bearing = getBearing(centerLat, centerLng, station.latitude, station.longitude);
+    const distanceRatio = clamp(station.distanceKm / 60, 0, 1);
+    const x = Number((50 + Math.sin(bearing) * distanceRatio * 38).toFixed(2));
+    const y = Number((50 - Math.cos(bearing) * distanceRatio * 38).toFixed(2));
+
+    return {
+      id: station.id,
+      name: station.name,
+      available: true,
+      latitude: station.latitude,
+      longitude: station.longitude,
+      x: clamp(x, 4, 96),
+      y: clamp(y, 6, 94),
+      location: station.location,
+      city: station.city,
+      state: station.state,
+      distanceKm: station.distanceKm
+    };
+  });
+}
+
+async function getAllStations(lat, lng, options = {}) {
+  return fetchLiveStations(lat, lng, options);
+}
+
+function getStationById() {
+  return null;
+}
+
+async function updateStationStock() {
+  return null;
+}
+
+async function getStationHistory() {
+  return [];
+}
+
+async function getPriceAlerts() {
+  return [];
+}
+
+async function getMapFeed(lat, lng, options = {}) {
+  const stations = await fetchLiveStations(lat, lng, options);
+  const centerLat = typeof lat === "number" ? lat : DEFAULT_LOCATION.latitude;
+  const centerLng = typeof lng === "number" ? lng : DEFAULT_LOCATION.longitude;
+  return buildMapFeed(stations, centerLat, centerLng);
+}
+
+async function getStationInsights(lat, lng, options = {}) {
+  return fetchLiveStations(lat, lng, options);
+}
+
+async function getNearbyStations(lat, lng, options = {}) {
+  return fetchLiveStations(lat, lng, options);
+}
+
+async function simulateRealtimeTick() {
+  return {
+    message: "Real-data mode does not simulate stock or price changes."
+  };
+}
 
 module.exports = {
+  DEFAULT_LOCATION,
   getAllStations,
   getStationById,
   updateStationStock,

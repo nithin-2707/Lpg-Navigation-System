@@ -9,68 +9,61 @@ const {
   simulateRealtimeTick
 } = require("../services/stationService");
 
-const availabilityEvents = [];
+function parseLocation(req) {
+  const latitude = Number(req.query.lat);
+  const longitude = Number(req.query.lng);
+  return {
+    latitude: Number.isFinite(latitude) ? latitude : undefined,
+    longitude: Number.isFinite(longitude) ? longitude : undefined,
+    radiusKm: req.query.radiusKm ? Number(req.query.radiusKm) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+    onlyAvailable: req.query.onlyAvailable === "true"
+  };
+}
 
-function listStations(req, res) {
-  const stations = getAllStations();
+async function listStations(req, res) {
+  const { latitude, longitude, radiusKm, limit } = parseLocation(req);
+  const stations = await getAllStations(latitude, longitude, { radiusKm, limit });
   res.json(stations);
 }
 
-function updateStock(req, res) {
+async function updateStock(req, res) {
   const { id, available, trigger } = req.body;
 
   if (typeof id !== "number" || typeof available !== "boolean") {
-    return res.status(400).json({
-      message: "Invalid payload. Expected: { id: number, available: boolean }"
+    return res.status(405).json({
+      message: "Real-data mode is read-only. Stock updates are not supported."
     });
   }
 
-  const result = updateStationStock(id, available, trigger);
-
-  if (!result) {
-    return res.status(404).json({ message: "Station not found" });
-  }
-
-  const { station, previous } = result;
-
-  if (!previous && station.available) {
-    availabilityEvents.push({
-      id: `${Date.now()}-${station.id}`,
-      stationId: station.id,
-      stationName: station.name,
-      becameAvailableAt: new Date().toISOString()
-    });
-  }
-
-  return res.json({
-    message: "Stock updated successfully",
-    station
+  return res.status(405).json({
+    message: "Real-data mode is read-only. Stock updates are not supported.",
+    trigger
   });
 }
 
-function listHistory(req, res) {
-  res.json(getStationHistory());
+async function listHistory(req, res) {
+  res.json(await getStationHistory());
 }
 
-function listPriceAlerts(req, res) {
-  res.json(getPriceAlerts());
+async function listPriceAlerts(req, res) {
+  res.json(await getPriceAlerts());
 }
 
-function listMapFeed(req, res) {
-  res.json(getMapFeed());
+async function listMapFeed(req, res) {
+  const { latitude, longitude, radiusKm, limit } = parseLocation(req);
+  res.json(await getMapFeed(latitude, longitude, { radiusKm, limit }));
 }
 
-function listStationInsights(req, res) {
-  res.json(getStationInsights());
+async function listStationInsights(req, res) {
+  const { latitude, longitude, radiusKm, limit } = parseLocation(req);
+  res.json(await getStationInsights(latitude, longitude, { radiusKm, limit }));
 }
 
-function listNearbyStations(req, res) {
-  const lat = Number(req.query.lat);
-  const lng = Number(req.query.lng);
-  const radiusKm = req.query.radiusKm ? Number(req.query.radiusKm) : 60;
-  const onlyAvailable = req.query.onlyAvailable === "true";
+async function listNearbyStations(req, res) {
+  const { latitude, longitude, radiusKm, limit, onlyAvailable } = parseLocation(req);
 
-  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return res.status(400).json({
       message: "Invalid query. Expected numeric lat and lng parameters."
     });
@@ -83,41 +76,24 @@ function listNearbyStations(req, res) {
   }
 
   return res.json(
-    getNearbyStations(lat, lng, {
-      radiusKm,
+    await getNearbyStations(latitude, longitude, {
+      radiusKm: radiusKm || 60,
       onlyAvailable,
-      limit: 20
+      limit: limit || 20
     })
   );
 }
 
-function triggerRealtimeTick(req, res) {
-  const result = simulateRealtimeTick();
+async function triggerRealtimeTick(req, res) {
+  const result = await simulateRealtimeTick();
   res.json({
-    message: "Realtime simulation tick complete",
+    message: result.message,
     result
   });
 }
 
-function listAvailabilityAlerts(req, res) {
-  const since = req.query.since;
-
-  if (!since) {
-    return res.json(availabilityEvents);
-  }
-
-  const sinceMs = Number(since);
-  if (Number.isNaN(sinceMs)) {
-    return res.status(400).json({
-      message: "Invalid query parameter 'since'. Expected unix timestamp in milliseconds."
-    });
-  }
-
-  const filtered = availabilityEvents.filter((event) => {
-    return new Date(event.becameAvailableAt).getTime() > sinceMs;
-  });
-
-  return res.json(filtered);
+async function listAvailabilityAlerts(req, res) {
+  res.json([]);
 }
 
 module.exports = {

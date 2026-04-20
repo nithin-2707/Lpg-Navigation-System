@@ -4,11 +4,9 @@ import {
   fetchHistory,
   fetchMapFeed,
   fetchNearbyStations,
-  fetchPriceAlerts,
   fetchStationInsights,
   fetchStations,
   simulateTick,
-  updateStock
 } from "./api";
 import DashboardPage from "./components/DashboardPage";
 import PriceAlertsPage from "./components/PriceAlertsPage";
@@ -20,44 +18,40 @@ const ALERT_REFRESH_INTERVAL_MS = 4000;
 const FEED_REFRESH_INTERVAL_MS = 5500;
 const SIMULATION_INTERVAL_MS = 12000;
 const NEARBY_RADIUS_KM = 60;
+const DEFAULT_LOCATION = { latitude: 16.4876, longitude: 80.5015 };
 const NAV_ITEMS = ["Dashboard", "Station Map", "Price Alerts", "Supply History"];
 
 function App() {
   const [stations, setStations] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
-  const [selectedStationId, setSelectedStationId] = useState(1);
-  const [loadingUpdate, setLoadingUpdate] = useState(false);
   const [error, setError] = useState("");
   const [alerts, setAlerts] = useState([]);
   const [history, setHistory] = useState([]);
-  const [priceAlerts, setPriceAlerts] = useState([]);
   const [mapFeed, setMapFeed] = useState([]);
   const [stationInsights, setStationInsights] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [nearbyStations, setNearbyStations] = useState([]);
-  const [onlyNearbyAvailable, setOnlyNearbyAvailable] = useState(false);
   const lastAlertCheckRef = useRef(Date.now());
   const locationWatchIdRef = useRef(null);
+
+  const activeLocation = userLocation || DEFAULT_LOCATION;
 
   const selectedStation = useMemo(() => {
     if (stationInsights.length === 0) {
       return null;
     }
 
-    return (
-      stationInsights.find((station) => station.id === selectedStationId) ||
-      stationInsights[0]
-    );
-  }, [stationInsights, selectedStationId]);
+    return stationInsights[0];
+  }, [stationInsights]);
 
   const availableCount = useMemo(() => {
-    return stations.filter((station) => station.available).length;
+    return stations.length;
   }, [stations]);
 
   const subscribedUsers = useMemo(() => {
-    return 1000 + availableCount * 71;
+    return 1000 + availableCount * 53;
   }, [availableCount]);
 
   const supplyStations = useMemo(() => {
@@ -67,24 +61,11 @@ function App() {
     return stationInsights;
   }, [userLocation, nearbyStations, stationInsights]);
 
-  const nearbyStationIds = useMemo(() => {
-    return new Set(nearbyStations.map((station) => station.id));
-  }, [nearbyStations]);
-
-  const nearbyPriceAlerts = useMemo(() => {
-    if (!userLocation || nearbyStationIds.size === 0) {
-      return priceAlerts;
-    }
-
-    const localAlerts = priceAlerts.filter((alert) => nearbyStationIds.has(alert.stationId));
-    return localAlerts;
-  }, [userLocation, nearbyStationIds, priceAlerts]);
-
-  async function loadNearbyStations(lat, lng, onlyAvailable = onlyNearbyAvailable) {
+  async function loadNearbyStations(lat, lng) {
     try {
       const data = await fetchNearbyStations(lat, lng, {
         radiusKm: NEARBY_RADIUS_KM,
-        onlyAvailable
+        onlyAvailable: false
       });
       setNearbyStations(data);
     } catch (err) {
@@ -154,11 +135,10 @@ function App() {
 
   async function loadStations() {
     try {
-      const data = await fetchStations();
+      const data = await fetchStations(activeLocation.latitude, activeLocation.longitude, {
+        radiusKm: NEARBY_RADIUS_KM
+      });
       setStations(data);
-      if (!data.some((station) => station.id === selectedStationId) && data[0]) {
-        setSelectedStationId(data[0].id);
-      }
       setError("");
     } catch (err) {
       setError(err.message);
@@ -167,7 +147,9 @@ function App() {
 
   async function loadInsights() {
     try {
-      const data = await fetchStationInsights();
+      const data = await fetchStationInsights(activeLocation.latitude, activeLocation.longitude, {
+        radiusKm: NEARBY_RADIUS_KM
+      });
       setStationInsights(data);
       setError("");
     } catch (err) {
@@ -177,41 +159,28 @@ function App() {
 
   async function loadMapAndFeeds() {
     try {
-      const [mapData, historyData, priceData] = await Promise.all([
-        fetchMapFeed(),
-        fetchHistory(),
-        fetchPriceAlerts()
+      const [mapData, historyData] = await Promise.all([
+        fetchMapFeed(activeLocation.latitude, activeLocation.longitude, {
+          radiusKm: NEARBY_RADIUS_KM
+        }),
+        fetchHistory()
       ]);
       setMapFeed(mapData);
       setHistory(historyData);
-      setPriceAlerts(priceData);
       setError("");
     } catch (err) {
       setError(err.message);
     }
   }
 
-  async function handleStockUpdate(id, available) {
-    try {
-      setLoadingUpdate(true);
-      await updateStock(id, available, "Manual Toggle (Admin)");
-      await Promise.all([loadStations(), loadInsights(), loadMapAndFeeds()]);
-      if (userLocation) {
-        await loadNearbyStations(userLocation.latitude, userLocation.longitude);
-      }
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingUpdate(false);
-    }
-  }
+  useEffect(() => {
+    requestLiveLocation();
+  }, []);
 
   useEffect(() => {
     loadStations();
     loadInsights();
     loadMapAndFeeds();
-    requestLiveLocation();
 
     const intervalId = setInterval(() => {
       loadStations();
@@ -219,21 +188,21 @@ function App() {
     }, STATION_REFRESH_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [activeLocation.latitude, activeLocation.longitude]);
 
   useEffect(() => {
     if (!userLocation) {
       return;
     }
 
-    loadNearbyStations(userLocation.latitude, userLocation.longitude, onlyNearbyAvailable);
+    loadNearbyStations(userLocation.latitude, userLocation.longitude);
 
     const intervalId = setInterval(() => {
-      loadNearbyStations(userLocation.latitude, userLocation.longitude, onlyNearbyAvailable);
+      loadNearbyStations(userLocation.latitude, userLocation.longitude);
     }, FEED_REFRESH_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, [userLocation, onlyNearbyAvailable]);
+  }, [userLocation]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -266,41 +235,9 @@ function App() {
     return () => clearInterval(intervalId);
   }, []);
 
-  useEffect(() => {
-    const intervalId = setInterval(async () => {
-      try {
-        await simulateTick();
-        await Promise.all([loadStations(), loadInsights(), loadMapAndFeeds()]);
-        if (userLocation) {
-          await loadNearbyStations(userLocation.latitude, userLocation.longitude);
-        }
-      } catch (err) {
-        setError(err.message);
-      }
-    }, SIMULATION_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
   async function handleSimulateTick() {
-    try {
-      await simulateTick();
-      await Promise.all([loadStations(), loadInsights(), loadMapAndFeeds()]);
-      if (userLocation) {
-        await loadNearbyStations(userLocation.latitude, userLocation.longitude);
-      }
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function handleQuickToggle() {
-    if (!selectedStation) {
-      return;
-    }
-
-    await handleStockUpdate(selectedStation.id, !selectedStation.available);
+    await Promise.resolve(simulateTick());
+    await Promise.all([loadStations(), loadInsights(), loadMapAndFeeds()]);
   }
 
   function renderActivePage() {
@@ -308,8 +245,6 @@ function App() {
       return (
         <StationMapPage
           mapFeed={mapFeed}
-          selectedStationId={selectedStationId}
-          onSelectStation={setSelectedStationId}
           selectedStation={selectedStation}
           userLocation={userLocation}
           locationError={locationError}
@@ -323,7 +258,7 @@ function App() {
     if (activeNav === "Price Alerts") {
       return (
         <PriceAlertsPage
-          priceAlerts={nearbyPriceAlerts}
+          stations={supplyStations}
           nearbyStations={nearbyStations}
           userLocation={userLocation}
           onSimulateTick={handleSimulateTick}
@@ -334,11 +269,8 @@ function App() {
     if (activeNav === "Supply History") {
       return (
         <SupplyHistoryPage
-          history={history}
           stations={supplyStations}
           isNearbyMode={Boolean(userLocation && nearbyStations.length > 0)}
-          onUpdateStock={handleStockUpdate}
-          onSimulateTick={handleSimulateTick}
         />
       );
     }
@@ -347,19 +279,14 @@ function App() {
       <DashboardPage
         selectedStation={selectedStation}
         subscribedUsers={subscribedUsers}
-        loadingUpdate={loadingUpdate}
-        onQuickToggle={handleQuickToggle}
         mapFeed={mapFeed}
-        onSelectStation={setSelectedStationId}
-        alerts={alerts}
-        history={history}
         userLocation={userLocation}
         locationError={locationError}
         locating={locating}
         onRequestLocation={requestLiveLocation}
         nearbyStations={nearbyStations}
-        onlyNearbyAvailable={onlyNearbyAvailable}
-        onToggleNearbyAvailable={() => setOnlyNearbyAvailable((value) => !value)}
+        alerts={alerts}
+        history={history}
       />
     );
   }

@@ -4,8 +4,27 @@ function buildApiUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
-export async function fetchStations() {
-  const response = await fetch(buildApiUrl("/api/stations"));
+function buildLocationQuery(lat, lng, options = {}) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    params.set("lat", String(lat));
+    params.set("lng", String(lng));
+  }
+  if (Number.isFinite(options.radiusKm)) {
+    params.set("radiusKm", String(options.radiusKm));
+  }
+  if (Number.isFinite(options.limit)) {
+    params.set("limit", String(options.limit));
+  }
+  if (typeof options.onlyAvailable === "boolean") {
+    params.set("onlyAvailable", String(options.onlyAvailable));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function fetchStations(lat, lng, options = {}) {
+  const response = await fetch(buildApiUrl(`/api/stations${buildLocationQuery(lat, lng, options)}`));
   if (!response.ok) {
     throw new Error("Failed to fetch stations");
   }
@@ -29,8 +48,8 @@ export async function updateStock(id, available, trigger) {
   return response.json();
 }
 
-export async function fetchStationInsights() {
-  const response = await fetch(buildApiUrl("/api/station-insights"));
+export async function fetchStationInsights(lat, lng, options = {}) {
+  const response = await fetch(buildApiUrl(`/api/station-insights${buildLocationQuery(lat, lng, options)}`));
   if (!response.ok) {
     throw new Error("Failed to fetch station insights");
   }
@@ -64,8 +83,8 @@ export async function fetchPriceAlerts() {
   return response.json();
 }
 
-export async function fetchMapFeed() {
-  const response = await fetch(buildApiUrl("/api/map-feed"));
+export async function fetchMapFeed(lat, lng, options = {}) {
+  const response = await fetch(buildApiUrl(`/api/map-feed${buildLocationQuery(lat, lng, options)}`));
   if (!response.ok) {
     throw new Error("Failed to fetch map feed");
   }

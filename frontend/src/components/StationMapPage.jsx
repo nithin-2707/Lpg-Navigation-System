@@ -17,8 +17,6 @@ const userLocationIcon = new L.DivIcon({
 
 function StationMapPage({
   mapFeed,
-  selectedStationId,
-  onSelectStation,
   selectedStation,
   userLocation,
   locationError,
@@ -34,13 +32,11 @@ function StationMapPage({
       ? { lat: selectedStation.latitude, lng: selectedStation.longitude }
       : { lat: 20.5937, lng: 78.9629 };
 
-  const selectedMapPoint = mapPoints.find((point) => point.id === selectedStationId);
-
   return (
     <section className="page-panel">
       <div className="page-head">
         <h2>Station Map</h2>
-        <p>OpenStreetMap view with live station pins and nearby routing support.</p>
+        <p>OpenStreetMap view with real nearby fuel station pins and routing support.</p>
       </div>
 
       <div className="map-page-grid">
@@ -54,7 +50,7 @@ function StationMapPage({
           <div className="leaflet-shell">
             <MapContainer
               center={mapCenter}
-              zoom={selectedMapPoint ? 11 : 5}
+              zoom={userLocation ? 11 : 5}
               className="leaflet-map"
               scrollWheelZoom
             >
@@ -67,14 +63,11 @@ function StationMapPage({
                 <Marker
                   key={point.id}
                   position={[point.latitude, point.longitude]}
-                  eventHandlers={{
-                    click: () => onSelectStation(point.id)
-                  }}
                 >
                   <Popup>
                     <strong>{point.name}</strong>
                     <br />
-                    {point.available ? "Available" : "Not Available"}
+                    {point.location || [point.city, point.state].filter(Boolean).join(", ")}
                   </Popup>
                 </Marker>
               ))}
@@ -96,10 +89,10 @@ function StationMapPage({
         <aside className="widget">
           <h4>Selected Station</h4>
           <p>{selectedStation?.name || "No station selected"}</p>
-          <p>{selectedStation?.location || "Select one from the map"}</p>
+          <p>{selectedStation?.location || [selectedStation?.city, selectedStation?.state].filter(Boolean).join(", ") || "Select one from the map"}</p>
           {selectedStation && (
             <p>
-              Petrol Rs.{selectedStation.petrolPrice.toFixed(2)}/L | Diesel Rs.{selectedStation.dieselPrice.toFixed(2)}/L
+              {selectedStation.brand || selectedStation.operator || "OpenStreetMap"}
             </p>
           )}
           {selectedStation && (
@@ -113,10 +106,8 @@ function StationMapPage({
             </a>
           )}
           <div className="selection-state">
-            <span className={selectedStation?.available ? "ok" : "no"}>
-              {selectedStation?.available ? "Available" : "Not Available"}
-            </span>
-            <small>ID: {selectedStationId}</small>
+            <span className="ok">Live station data</span>
+            <small>{selectedStation?.openingHours || selectedStation?.source || "OpenStreetMap"}</small>
           </div>
           <button className="wide-pill" onClick={onRequestLocation}>
             {locating ? "Locating..." : "Find Nearby from My Location"}
@@ -132,7 +123,6 @@ function StationMapPage({
               <button
                 key={item.id}
                 className="nearby-item compact"
-                onClick={() => onSelectStation(item.id)}
               >
                 <strong>{item.name}</strong>
                 <span>{item.distanceKm.toFixed(2)} km</span>

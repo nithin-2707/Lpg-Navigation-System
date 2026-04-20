@@ -1,16 +1,16 @@
-function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulateTick }) {
-  const visibleNearbyStations = nearbyStations.slice(0, 6);
+function PriceAlertsPage({ stations, nearbyStations, userLocation, onSimulateTick }) {
+  const visibleNearbyStations = (nearbyStations.length > 0 ? nearbyStations : stations).slice(0, 8);
 
   return (
     <section className="page-panel">
       <div className="page-head">
         <h2>Price Alerts</h2>
-        <p>Real-time fuel price movement (petrol and diesel per litre).</p>
+        <p>Live nearby station data from OpenStreetMap. No fake pricing or simulated stock values.</p>
       </div>
 
       <article className="widget">
         <div className="activity-head">
-          <h3>Current Nearby Prices</h3>
+          <h3>Nearby Fuel Stations</h3>
         </div>
 
         <table className="price-table">
@@ -18,9 +18,9 @@ function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulate
             <tr>
               <th>Station</th>
               <th>Distance</th>
-              <th>Petrol</th>
-              <th>Diesel</th>
-              <th>Status</th>
+              <th>Location</th>
+              <th>Brand / Operator</th>
+              <th>Contact</th>
             </tr>
           </thead>
           <tbody>
@@ -28,11 +28,9 @@ function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulate
               <tr key={`nearby-${station.id}`}>
                 <td>{station.name}</td>
                 <td>{station.distanceKm.toFixed(2)} km</td>
-                <td>Rs.{station.petrolPrice.toFixed(2)}/L</td>
-                <td>Rs.{station.dieselPrice.toFixed(2)}/L</td>
-                <td className={station.available ? "ok" : "no"}>
-                  {station.available ? "Available" : "Not Available"}
-                </td>
+                <td>{station.location || [station.city, station.state].filter(Boolean).join(", ")}</td>
+                <td>{station.brand || station.operator || "OpenStreetMap"}</td>
+                <td>{station.phone || station.openingHours || "No live contact info"}</td>
               </tr>
             ))}
             {visibleNearbyStations.length === 0 && (
@@ -40,7 +38,7 @@ function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulate
                 <td colSpan="5">
                   {userLocation
                     ? "No nearby stations found yet. Use current location and try again."
-                    : "Enable location to see current nearby station prices."}
+                    : "Enable location to see current nearby station data."}
                 </td>
               </tr>
             )}
@@ -50,9 +48,9 @@ function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulate
 
       <article className="widget">
         <div className="activity-head">
-          <h3>{userLocation ? "Live Price Feed (Nearby)" : "Live Price Feed"}</h3>
+          <h3>{userLocation ? "Live Station Feed (Nearby)" : "Live Station Feed"}</h3>
           <button className="wide-pill" onClick={onSimulateTick}>
-            Trigger Realtime Tick
+            Refresh Live Data
           </button>
         </div>
 
@@ -60,33 +58,26 @@ function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulate
           <thead>
             <tr>
               <th>Station</th>
-              <th>Fuel</th>
-              <th>Previous</th>
-              <th>Current</th>
-              <th>Delta</th>
-              <th>Timestamp</th>
+              <th>Address</th>
+              <th>Hours</th>
+              <th>Source</th>
             </tr>
           </thead>
           <tbody>
-            {priceAlerts.slice(0, 12).map((item) => (
+            {visibleNearbyStations.slice(0, 12).map((item) => (
               <tr key={item.id}>
-                <td>{item.stationName}</td>
-                <td>{item.fuelType ? item.fuelType.toUpperCase() : "PETROL"}</td>
-                <td>Rs.{item.previousPrice.toFixed(2)}/L</td>
-                <td>Rs.{item.currentPrice.toFixed(2)}/L</td>
-                <td className={item.delta >= 0 ? "no" : "ok"}>
-                  {item.delta >= 0 ? "+" : ""}
-                  {item.delta.toFixed(2)}
-                </td>
-                <td>{new Date(item.timestamp).toLocaleString()}</td>
+                <td>{item.name}</td>
+                <td>{item.location || [item.city, item.state].filter(Boolean).join(", ")}</td>
+                <td>{item.openingHours || "Not listed"}</td>
+                <td>{item.source || "OpenStreetMap"}</td>
               </tr>
             ))}
-            {priceAlerts.length === 0 && (
+            {visibleNearbyStations.length === 0 && (
               <tr>
                 <td colSpan="6">
                   {userLocation
-                    ? "No nearby price alerts yet. Trigger a realtime tick to generate local movement."
-                    : "No fuel price alerts yet. Trigger a simulation tick."}
+                    ? "No nearby station data yet. Trigger a refresh or re-enable location."
+                    : "No station data yet. Enable location to load live data."}
                 </td>
               </tr>
             )}
