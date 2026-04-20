@@ -67,6 +67,19 @@ function App() {
     return stationInsights;
   }, [userLocation, nearbyStations, stationInsights]);
 
+  const nearbyStationIds = useMemo(() => {
+    return new Set(nearbyStations.map((station) => station.id));
+  }, [nearbyStations]);
+
+  const nearbyPriceAlerts = useMemo(() => {
+    if (!userLocation || nearbyStationIds.size === 0) {
+      return priceAlerts;
+    }
+
+    const localAlerts = priceAlerts.filter((alert) => nearbyStationIds.has(alert.stationId));
+    return localAlerts;
+  }, [userLocation, nearbyStationIds, priceAlerts]);
+
   async function loadNearbyStations(lat, lng, onlyAvailable = onlyNearbyAvailable) {
     try {
       const data = await fetchNearbyStations(lat, lng, {
@@ -310,7 +323,9 @@ function App() {
     if (activeNav === "Price Alerts") {
       return (
         <PriceAlertsPage
-          priceAlerts={priceAlerts}
+          priceAlerts={nearbyPriceAlerts}
+          nearbyStations={nearbyStations}
+          userLocation={userLocation}
           onSimulateTick={handleSimulateTick}
         />
       );

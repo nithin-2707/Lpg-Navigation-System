@@ -1,4 +1,6 @@
-function PriceAlertsPage({ priceAlerts, onSimulateTick }) {
+function PriceAlertsPage({ priceAlerts, nearbyStations, userLocation, onSimulateTick }) {
+  const visibleNearbyStations = nearbyStations.slice(0, 6);
+
   return (
     <section className="page-panel">
       <div className="page-head">
@@ -8,7 +10,47 @@ function PriceAlertsPage({ priceAlerts, onSimulateTick }) {
 
       <article className="widget">
         <div className="activity-head">
-          <h3>Live Price Feed</h3>
+          <h3>Current Nearby Prices</h3>
+        </div>
+
+        <table className="price-table">
+          <thead>
+            <tr>
+              <th>Station</th>
+              <th>Distance</th>
+              <th>Petrol</th>
+              <th>Diesel</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleNearbyStations.map((station) => (
+              <tr key={`nearby-${station.id}`}>
+                <td>{station.name}</td>
+                <td>{station.distanceKm.toFixed(2)} km</td>
+                <td>Rs.{station.petrolPrice.toFixed(2)}/L</td>
+                <td>Rs.{station.dieselPrice.toFixed(2)}/L</td>
+                <td className={station.available ? "ok" : "no"}>
+                  {station.available ? "Available" : "Not Available"}
+                </td>
+              </tr>
+            ))}
+            {visibleNearbyStations.length === 0 && (
+              <tr>
+                <td colSpan="5">
+                  {userLocation
+                    ? "No nearby stations found yet. Use current location and try again."
+                    : "Enable location to see current nearby station prices."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </article>
+
+      <article className="widget">
+        <div className="activity-head">
+          <h3>{userLocation ? "Live Price Feed (Nearby)" : "Live Price Feed"}</h3>
           <button className="wide-pill" onClick={onSimulateTick}>
             Trigger Realtime Tick
           </button>
@@ -41,7 +83,11 @@ function PriceAlertsPage({ priceAlerts, onSimulateTick }) {
             ))}
             {priceAlerts.length === 0 && (
               <tr>
-                <td colSpan="6">No fuel price alerts yet. Trigger a simulation tick.</td>
+                <td colSpan="6">
+                  {userLocation
+                    ? "No nearby price alerts yet. Trigger a realtime tick to generate local movement."
+                    : "No fuel price alerts yet. Trigger a simulation tick."}
+                </td>
               </tr>
             )}
           </tbody>
