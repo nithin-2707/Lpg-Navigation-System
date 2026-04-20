@@ -1,6 +1,13 @@
 const PHOTON_URL = "https://photon.komoot.io/api/";
 const DEFAULT_LOCATION = { latitude: 16.4876, longitude: 80.5015 };
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const PHOTON_QUERY_TERMS = [
+  "petrol pump",
+  "bharat petroleum",
+  "indian oil",
+  "hp petrol pump",
+  "reliance petrol pump"
+];
 
 const cache = new Map();
 
@@ -85,29 +92,39 @@ async function fetchLiveStations(lat = DEFAULT_LOCATION.latitude, lng = DEFAULT_
     return cached.data;
   }
 
-  const url = new URL(PHOTON_URL);
-  url.searchParams.set("q", "petrol pump");
-  url.searchParams.set("lat", String(lat));
-  url.searchParams.set("lon", String(lng));
-  url.searchParams.set("limit", String(Math.max(limit * 3, 40)));
-  url.searchParams.set("lang", "en");
+  async function fetchByTerm(term) {
+    const url = new URL(PHOTON_URL);
+    url.searchParams.set("q", term);
+    url.searchParams.set("lat", String(lat));
+    url.searchParams.set("lon", String(lng));
+    url.searchParams.set("limit", String(Math.max(limit * 3, 40)));
+    url.searchParams.set("lang", "en");
+    url.searchParams.set("osm_tag", "amenity:fuel");
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "LPG-Navigation-System/1.0",
-      Accept: "application/json"
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "LPG-Navigation-System/1.0",
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      return [];
     }
-  });
 
-  if (!response.ok) {
-    throw new Error(`Failed to load live station data (${response.status})`);
+    const payload = await response.json();
+    return (payload.features || [])
+      .map((feature) => normalizeFeature(feature, lat, lng))
+      .filter(Boolean);
   }
 
-  const payload = await response.json();
-  const stations = (payload.features || [])
-    .map((feature) => normalizeFeature(feature, lat, lng))
-    .filter(Boolean)
-    .sort((a, b) => a.distanceKm - b.distanceKm)
+  const batches = await Promise.all(PHOTON_QUERY_TERMS.map((term) => fetchByTerm(term)));
+  const stationMap = new Map();
+  batches.flat().forEach((station) => {
+    stationMap.set(station.id, station);
+  });
+
+  const stations = Array.from(stationMap.values()).sort((a, b) => a.distanceKm - b.distanceKm);
   const withinRadius = stations.filter((station) => station.distanceKm <= radiusKm);
   const result = withinRadius.length > 0 ? withinRadius.slice(0, limit) : stations.slice(0, Math.min(limit, 5));
 
