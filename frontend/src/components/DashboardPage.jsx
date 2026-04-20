@@ -1,3 +1,7 @@
+import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 function DashboardPage({
   selectedStation,
   subscribedUsers,
@@ -13,6 +17,19 @@ function DashboardPage({
 }) {
   const mapStations = (nearbyStations.length > 0 ? nearbyStations : mapFeed).slice(0, 14);
   const compactNearbyStations = nearbyStations.slice(0, 4);
+
+  const mapCenter = userLocation
+    ? [userLocation.latitude, userLocation.longitude]
+    : selectedStation
+      ? [selectedStation.latitude, selectedStation.longitude]
+      : [16.4876, 80.5015];
+
+  const userLocationIcon = new L.DivIcon({
+    className: "user-location-marker",
+    html: '<span class="pulse"></span>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
 
   function getBrandCode(station) {
     const source = `${station.brand || ""} ${station.operator || ""} ${station.name || ""}`.toLowerCase();
@@ -32,18 +49,15 @@ function DashboardPage({
     return "otr";
   }
 
-  function toMapPosition(station, index) {
-    if (typeof station.x === "number" && typeof station.y === "number") {
-      return { left: station.x, top: station.y };
-    }
-
-    const columns = 5;
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    return {
-      left: 12 + column * 18,
-      top: 22 + row * 20
-    };
+  function buildBrandIcon(station) {
+    const code = getBrandCode(station);
+    const brandClass = getBrandClass(station);
+    return new L.DivIcon({
+      className: `dashboard-brand-pin dashboard-brand-pin-${brandClass}`,
+      html: `<span>${code}</span>`,
+      iconSize: [48, 24],
+      iconAnchor: [24, 12]
+    });
   }
 
   return (
@@ -83,27 +97,47 @@ function DashboardPage({
       <section className="board-grid">
         <article className="map-stage">
           <p className="meta">Live System Status: Real Data</p>
-          <div className="map-grid-overlay">
-            {mapStations.map((station, index) => {
-              const pos = toMapPosition(station, index);
-              const brandCode = getBrandCode(station);
-              const brandClass = getBrandClass(station);
+          <div className="leaflet-shell dashboard-map-shell">
+            <MapContainer
+              center={mapCenter}
+              zoom={11}
+              className="leaflet-map dashboard-mini-map"
+              scrollWheelZoom
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
 
-              return (
-                <button
+              {mapStations.map((station) => (
+                <Marker
                   key={station.id}
-                  className={`map-pin map-pin-${brandClass}`}
-                  style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
-                  title={`${station.name} - ${brandCode}`}
+                  position={[station.latitude, station.longitude]}
+                  icon={buildBrandIcon(station)}
                 >
-                  {brandCode}
-                </button>
-              );
-            })}
-            {mapStations.length === 0 && (
-              <p className="mode-note map-empty-note">No live nearby stations loaded yet.</p>
-            )}
+                  <Popup>
+                    <strong>{station.name}</strong>
+                    <br />
+                    {station.location || [station.city, station.state].filter(Boolean).join(", ")}
+                  </Popup>
+                </Marker>
+              ))}
+
+              {userLocation && (
+                <Marker
+                  position={[userLocation.latitude, userLocation.longitude]}
+                  icon={userLocationIcon}
+                >
+                  <Popup>Your current location</Popup>
+                </Marker>
+              )}
+            </MapContainer>
           </div>
+
+          <div className="mode-note">Brand markers represent nearby station operators (IOCL, HP, BPCL, JIO).</div>
+          {mapStations.length === 0 && (
+            <p className="mode-note map-empty-note">No live nearby stations loaded yet.</p>
+          )}
           <div className="activity-head">
             <button className="quiet-action" onClick={onOpenNearbyPage}>
               View All Nearby Stations

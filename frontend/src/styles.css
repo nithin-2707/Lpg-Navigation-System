@@ -940,6 +940,53 @@ button {
   background: #0a1c33;
 }
 
+.dashboard-map-shell {
+  margin-bottom: 0.55rem;
+}
+
+.dashboard-mini-map {
+  height: 300px;
+}
+
+.dashboard-brand-pin {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  min-width: 48px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 12px rgba(4, 10, 20, 0.45);
+}
+
+.dashboard-brand-pin span {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #061321;
+}
+
+.dashboard-brand-pin-iocl {
+  background: linear-gradient(145deg, #ffd25e, #f6a80b);
+}
+
+.dashboard-brand-pin-bpcl {
+  background: linear-gradient(145deg, #8bd9ff, #2ca3e5);
+}
+
+.dashboard-brand-pin-hp {
+  background: linear-gradient(145deg, #ffb58d, #ee7442);
+}
+
+.dashboard-brand-pin-jio {
+  background: linear-gradient(145deg, #f5a5ff, #c45ce0);
+}
+
+.dashboard-brand-pin-otr {
+  background: linear-gradient(145deg, #d6e7ff, #92afcf);
+}
+
 .user-location-marker {
   background: transparent;
   border: 0;
