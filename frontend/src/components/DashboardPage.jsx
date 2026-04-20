@@ -9,7 +9,11 @@ function DashboardPage({
   locating,
   onRequestLocation,
   nearbyStations,
+  onOpenNearbyPage,
 }) {
+  const liveSnapshotStations = (nearbyStations.length > 0 ? nearbyStations : mapFeed).slice(0, 8);
+  const compactNearbyStations = nearbyStations.slice(0, 4);
+
   return (
     <>
       <section className="hero-row">
@@ -46,21 +50,26 @@ function DashboardPage({
 
       <section className="board-grid">
         <article className="map-stage">
-          <p className="meta">Live System Status: Real Data</p>
-          <div className="map-grid-overlay">
-            {mapFeed.map((point) => (
-              <button
-                key={point.id}
-                className="map-dot on"
-                style={{ left: `${point.x}%`, top: `${point.y}%` }}
-                title={point.name}
-              />
+          <p className="meta">Live System Snapshot</p>
+          <div className="live-snapshot-grid">
+            {liveSnapshotStations.map((station) => (
+              <div key={station.id} className="live-snapshot-chip">
+                <strong>{station.name}</strong>
+                <span>
+                  {typeof station.distanceKm === "number"
+                    ? `${station.distanceKm.toFixed(2)} km`
+                    : station.city || station.state || "Nearby"}
+                </span>
+              </div>
             ))}
+            {liveSnapshotStations.length === 0 && (
+              <p className="mode-note">No live nearby stations loaded yet.</p>
+            )}
           </div>
-          <div className="map-controls">
-            <button>+</button>
-            <button>-</button>
-            <button>o</button>
+          <div className="activity-head">
+            <button className="quiet-action" onClick={onOpenNearbyPage}>
+              View All Nearby Stations
+            </button>
           </div>
         </article>
 
@@ -71,9 +80,7 @@ function DashboardPage({
             {alerts.slice(0, 3).map((item) => (
               <li key={item.id}>
                 <strong>{item.stationName}</strong>
-                <span>
-                  {item.note || "Live data feed"}
-                </span>
+                <span>{item.note || "Live data feed"}</span>
               </li>
             ))}
             {alerts.length === 0 && (
@@ -90,9 +97,14 @@ function DashboardPage({
       <section className="nearby-panel">
         <div className="activity-head">
           <h3>Nearby Fuel Stations (Live Location)</h3>
-          <button className="wide-pill" onClick={onRequestLocation}>
-            {locating ? "Locating..." : "Use Current Location"}
-          </button>
+          <div className="nearby-actions">
+            <button className="quiet-action" onClick={onOpenNearbyPage}>
+              View All Nearby Stations
+            </button>
+            <button className="wide-pill" onClick={onRequestLocation}>
+              {locating ? "Locating..." : "Use Current Location"}
+            </button>
+          </div>
         </div>
         {userLocation && (
           <p className="live-location-text">
@@ -101,18 +113,18 @@ function DashboardPage({
         )}
         {locationError && <p className="live-location-error">{locationError}</p>}
         <div className="nearby-list">
-          {nearbyStations.map((station) => (
-            <button
-              key={station.id}
-              className="nearby-item"
-            >
+          {compactNearbyStations.map((station) => (
+            <button key={station.id} className="nearby-item">
               <strong>{station.name}</strong>
               <span>{station.location || [station.city, station.state].filter(Boolean).join(", ")}</span>
               <span>{station.distanceKm.toFixed(2)} km away</span>
               <span>{station.brand || station.operator || "OpenStreetMap"}</span>
             </button>
           ))}
-          {nearbyStations.length === 0 && (
+          {nearbyStations.length > 4 && (
+            <p className="mode-note">Showing top 4 nearby stations. Tap "View All Nearby Stations" for full list.</p>
+          )}
+          {compactNearbyStations.length === 0 && (
             <p>No stations found in 60 km radius. Showing closest options when available.</p>
           )}
         </div>

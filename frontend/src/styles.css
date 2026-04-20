@@ -313,6 +313,31 @@ button {
   min-height: 330px;
 }
 
+.live-snapshot-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.55rem;
+}
+
+.live-snapshot-chip {
+  border: 1px solid rgba(153, 185, 220, 0.2);
+  border-radius: 12px;
+  background: rgba(112, 144, 184, 0.1);
+  padding: 0.62rem;
+}
+
+.live-snapshot-chip strong,
+.live-snapshot-chip span {
+  display: block;
+}
+
+.live-snapshot-chip span {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .map-grid-overlay {
   position: relative;
   margin-top: 0.7rem;

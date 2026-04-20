@@ -16,10 +16,9 @@ import SupplyHistoryPage from "./components/SupplyHistoryPage";
 const STATION_REFRESH_INTERVAL_MS = 5000;
 const ALERT_REFRESH_INTERVAL_MS = 4000;
 const FEED_REFRESH_INTERVAL_MS = 5500;
-const SIMULATION_INTERVAL_MS = 12000;
 const NEARBY_RADIUS_KM = 60;
 const DEFAULT_LOCATION = { latitude: 16.4876, longitude: 80.5015 };
-const NAV_ITEMS = ["Dashboard", "Station Map", "Price Alerts", "Supply History"];
+const NAV_ITEMS = ["Dashboard", "Station Map", "Live Nearby Stations", "Supply History"];
 
 function App() {
   const [stations, setStations] = useState([]);
@@ -235,7 +234,7 @@ function App() {
     return () => clearInterval(intervalId);
   }, []);
 
-  async function handleSimulateTick() {
+  async function handleRefreshLiveData() {
     await Promise.resolve(simulateTick());
     await Promise.all([loadStations(), loadInsights(), loadMapAndFeeds()]);
   }
@@ -255,13 +254,13 @@ function App() {
       );
     }
 
-    if (activeNav === "Price Alerts") {
+    if (activeNav === "Live Nearby Stations") {
       return (
         <PriceAlertsPage
           stations={supplyStations}
           nearbyStations={nearbyStations}
           userLocation={userLocation}
-          onSimulateTick={handleSimulateTick}
+          onRefreshLiveData={handleRefreshLiveData}
         />
       );
     }
@@ -287,6 +286,7 @@ function App() {
         nearbyStations={nearbyStations}
         alerts={alerts}
         history={history}
+        onOpenNearbyPage={() => setActiveNav("Live Nearby Stations")}
       />
     );
   }

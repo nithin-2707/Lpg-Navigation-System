@@ -1,11 +1,11 @@
-function PriceAlertsPage({ stations, nearbyStations, userLocation, onSimulateTick }) {
+function PriceAlertsPage({ stations, nearbyStations, userLocation, onRefreshLiveData }) {
   const visibleNearbyStations = (nearbyStations.length > 0 ? nearbyStations : stations).slice(0, 8);
 
   return (
     <section className="page-panel">
       <div className="page-head">
-        <h2>Price Alerts</h2>
-        <p>Live nearby station data from OpenStreetMap. No fake pricing or simulated stock values.</p>
+        <h2>Live Nearby Stations</h2>
+        <p>Fully real-data mode using nearby station records from OpenStreetMap.</p>
       </div>
 
       <article className="widget">
@@ -49,7 +49,7 @@ function PriceAlertsPage({ stations, nearbyStations, userLocation, onSimulateTic
       <article className="widget">
         <div className="activity-head">
           <h3>{userLocation ? "Live Station Feed (Nearby)" : "Live Station Feed"}</h3>
-          <button className="wide-pill" onClick={onSimulateTick}>
+          <button className="wide-pill" onClick={onRefreshLiveData}>
             Refresh Live Data
           </button>
         </div>
@@ -74,7 +74,7 @@ function PriceAlertsPage({ stations, nearbyStations, userLocation, onSimulateTic
             ))}
             {visibleNearbyStations.length === 0 && (
               <tr>
-                <td colSpan="6">
+                <td colSpan="4">
                   {userLocation
                     ? "No nearby station data yet. Trigger a refresh or re-enable location."
                     : "No station data yet. Enable location to load live data."}
